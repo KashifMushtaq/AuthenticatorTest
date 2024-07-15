@@ -1,0 +1,700 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>QrCodeGenerator</name>
+    </assembly>
+    <members>
+        <member name="T:Net.Codecrete.QrCodeGenerator.BitArrayExtensions">
+            <summary>
+            Extension methods for the <see cref="T:System.Collections.BitArray"/> class.
+            </summary>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.BitArrayExtensions.AppendBits(System.Collections.BitArray,System.UInt32,System.Int32)">
+            <summary>
+            Appends the specified number bits of the specified value to this bit array.
+            <para>
+            The least significant bits of the specified value are added. They are appended in reverse order,
+            from the most significant to the least significant one, i.e. bits 0 to <i>len-1</i>
+            are appended in the order <i>len-1</i>, <i>len-2</i> ... 1, 0.
+            </para>
+            <para>
+            Requires 0 &#x2264; len &#x2264; 31, and 0 &#x2264; val &lt; 2<sup>len</sup>.
+            </para>
+            </summary>
+            <param name="bitArray">The BitArray instance that this method extends.</param>
+            <param name="val">The value to append.</param>
+            <param name="len">The number of low-order bits in the value to append.</param>
+            <exception cref="T:System.ArgumentOutOfRangeException">Value or number of bits is out of range.</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.BitArrayExtensions.AppendData(System.Collections.BitArray,System.Collections.BitArray)">
+            <summary>
+            Appends the content of the specified bit array to the end of this array.
+            </summary>
+            <param name="bitArray">The BitArray instance that this method extends.</param>
+            <param name="otherArray">The bit array to append</param>
+            <exception cref="T:System.ArgumentNullException">If <c>bitArray</c> is <c>null</c>.</exception>
+        </member>
+        <member name="T:Net.Codecrete.QrCodeGenerator.DataTooLongException">
+            <summary>
+            The exception that is thrown when the supplied data does not fit in the QR code.
+            </summary>
+            <remarks>
+            Ways to handle this exception include:
+            <ul>
+              <li>Decrease the error correction level (if it was greater than <see cref="F:Net.Codecrete.QrCodeGenerator.QrCode.Ecc.Low"/>)</li>
+              <li>Increase the <c>maxVersion</c> argument (if it was less than <see cref="F:Net.Codecrete.QrCodeGenerator.QrCode.MaxVersion"/>).
+                  This advice applies to the advanced factory functions
+                  <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeSegments(System.Collections.Generic.List{Net.Codecrete.QrCodeGenerator.QrSegment},Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Int32,System.Int32,System.Int32,System.Boolean)"/> and
+                  <see cref="M:Net.Codecrete.QrCodeGenerator.QrSegmentAdvanced.MakeSegmentsOptimally(System.String,Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Int32,System.Int32)"/> only.
+                  Other factory functions automatically try all versions up to <see cref="F:Net.Codecrete.QrCodeGenerator.QrCode.MaxVersion"/>.</li>
+              <li>Split the text into several segments and encode them using different encoding modes
+                (see <see cref="M:Net.Codecrete.QrCodeGenerator.QrSegmentAdvanced.MakeSegmentsOptimally(System.String,Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Int32,System.Int32)"/>.)</li>
+              <li>Make the text or binary data shorter.</li>
+              <li>Change the text to fit the character set of a particular segment mode (e.g. alphanumeric).</li>
+              <li>Reject the data and notify the caller/user.</li>
+            </ul>
+            </remarks>
+            <seealso cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeText(System.String,Net.Codecrete.QrCodeGenerator.QrCode.Ecc)"/>
+            <seealso cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeBinary(System.Byte[],Net.Codecrete.QrCodeGenerator.QrCode.Ecc)"/>
+            <seealso cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeSegments(System.Collections.Generic.List{Net.Codecrete.QrCodeGenerator.QrSegment},Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Int32,System.Int32,System.Int32,System.Boolean)"/>
+            <seealso cref="M:Net.Codecrete.QrCodeGenerator.QrSegmentAdvanced.MakeSegmentsOptimally(System.String,Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Int32,System.Int32)"/>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.DataTooLongException.#ctor(System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Net.Codecrete.QrCodeGenerator.DataTooLongException"/> class.
+            </summary>
+            <param name="message">The message that describes the error.</param>
+        </member>
+        <member name="T:Net.Codecrete.QrCodeGenerator.Objects">
+            <summary>
+            Helper functions to check for valid arguments.
+            </summary>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.Objects.RequireNonNull``1(``0)">
+            <summary>
+            Ensures that the specified argument is <i>not null</i>.
+            <para>
+            Throws a <see cref="T:System.ArgumentNullException"/> exception if the argument is <c>null</c>.
+            </para>
+            </summary>
+            <typeparam name="T">The type of the argument.</typeparam>
+            <param name="arg">The argument to check.</param>
+            <returns>Argument passed to function.</returns>
+            <exception cref="T:System.ArgumentNullException">The specified argument is <c>null</c>.</exception>
+        </member>
+        <member name="T:Net.Codecrete.QrCodeGenerator.QrCode">
+            <summary>
+            Represents a QR code containing text or binary data.
+            <para>
+            Instances of this class represent an immutable square grid of dark and light pixels
+            (called <i>modules</i> by the QR code specification).
+            Static factory methods are provided to create QR codes from text or binary data.
+            Some of the methods provide detailed control about the encoding parameters such a QR
+            code size (called <i>version</i> by the standard), error correction level and mask.
+            </para>
+            <para>
+            QR codes are a type of two-dimensional barcodes, invented by Denso Wave and
+            described in the ISO/IEC 18004 standard.
+            </para>
+            <para>
+            This class covers the QR Code Model 2 specification, supporting all versions (sizes)
+            from 1 to 40, all 4 error correction levels, and 4 character encoding modes.</para>
+            </summary>
+            <remarks>
+            <para>
+            To create a QR code instance:
+            </para>
+            <ul>
+              <li>High level: Take the payload data and call <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeText(System.String,Net.Codecrete.QrCodeGenerator.QrCode.Ecc)"/>
+                  or <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeBinary(System.Byte[],Net.Codecrete.QrCodeGenerator.QrCode.Ecc)"/>.</li>
+              <li>Mid level: Custom-make a list of <see cref="T:Net.Codecrete.QrCodeGenerator.QrSegment"/> instances and call
+                  <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeSegments(System.Collections.Generic.List{Net.Codecrete.QrCodeGenerator.QrSegment},Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Int32,System.Int32,System.Int32,System.Boolean)"/></li>
+              <li>Low level: Custom-make an array of data codeword bytes (including segment headers and
+                  final padding, excluding error correction codewords), supply the appropriate version number,
+                  and call the <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.#ctor(System.Int32,Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Byte[],System.Int32)"/>.</li>
+            </ul>
+            </remarks>
+            <seealso cref="T:Net.Codecrete.QrCodeGenerator.QrSegment"/>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeText(System.String,Net.Codecrete.QrCodeGenerator.QrCode.Ecc)">
+            <summary>
+            Creates a QR code representing the specified text using the specified error correction level.
+            <para>
+            As a conservative upper bound, this function is guaranteed to succeed for strings with up to 738
+            Unicode code points (not UTF-16 code units) if the low error correction level is used. The smallest possible
+            QR code version (size) is automatically chosen. The resulting ECC level will be higher than the one
+            specified if it can be achieved without increasing the size (version).
+            </para>
+            </summary>
+            <param name="text">The text to be encoded. The full range of Unicode characters may be used.</param>
+            <param name="ecl">The minimum error correction level to use.</param>
+            <returns>The created QR code instance representing the specified text.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="text"/> or <paramref name="ecl"/> is <c>null</c>.</exception>
+            <exception cref="T:Net.Codecrete.QrCodeGenerator.DataTooLongException">The text is too long to fit in the largest QR code size (version)
+            at the specified error correction level.</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeBinary(System.Byte[],Net.Codecrete.QrCodeGenerator.QrCode.Ecc)">
+            <summary>
+            Creates a QR code representing the specified binary data using the specified error correction level.
+            <para>
+            This function encodes the data in the binary segment mode. The maximum number of
+            bytes allowed is 2953. The smallest possible QR code version is automatically chosen.
+            The resulting ECC level will be higher than the one specified if it can be achieved without increasing the size (version).
+            </para>
+            </summary>
+            <param name="data">The binary data to encode.</param>
+            <param name="ecl">The minimum error correction level to use.</param>
+            <returns>The created QR code representing the specified data.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="data"/> or <paramref name="ecl"/> is <c>null</c>.</exception>
+            <exception cref="T:Net.Codecrete.QrCodeGenerator.DataTooLongException">The specified data is too long to fit in the largest QR code size (version)
+            at the specified error correction level.</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeSegments(System.Collections.Generic.List{Net.Codecrete.QrCodeGenerator.QrSegment},Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Int32,System.Int32,System.Int32,System.Boolean)">
+            <summary>
+            Creates a QR code representing the specified segments with the specified encoding parameters.
+            <para>
+            The smallest possible QR code version (size) is used. The range of versions can be
+            restricted by the <paramref name="minVersion"/> and <paramref name="maxVersion"/> parameters.
+            </para>
+            <para>
+            If <paramref name="boostEcl"/> is <c>true</c>, the resulting ECC level will be higher than the
+            one specified if it can be achieved without increasing the size (version).
+            </para>
+            <para>
+            The QR code mask is usually automatically chosen. It can be explicitly set with the <paramref name="mask"/>
+            parameter by using a value between 0 to 7 (inclusive). -1 is for automatic mode (which may be slow).
+            </para>
+            <para>
+            This function allows the user to create a custom sequence of segments that switches
+            between modes (such as alphanumeric and byte) to encode text in less space and gives full control over all
+            encoding parameters.
+            </para>
+            </summary>
+            <remarks>
+            This is a mid-level API; the high-level APIs are <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeText(System.String,Net.Codecrete.QrCodeGenerator.QrCode.Ecc)"/>
+            and <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeBinary(System.Byte[],Net.Codecrete.QrCodeGenerator.QrCode.Ecc)"/>.
+            </remarks>
+            <param name="segments">The segments to encode.</param>
+            <param name="ecl">The minimal or fixed error correction level to use .</param>
+            <param name="minVersion">The minimum version (size) of the QR code (between 1 and 40).</param>
+            <param name="maxVersion">The maximum version (size) of the QR code (between 1 and 40).</param>
+            <param name="mask">The mask number to use (between 0 and 7), or -1 for automatic mask selection.</param>
+            <param name="boostEcl">If <c>true</c> the ECC level wil be increased if it can be achieved without increasing the size (version).</param>
+            <returns>The created QR code representing the segments.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="segments"/>, any list element, or <paramref name="ecl"/> is <c>null</c>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">1 &#x2264; minVersion &#x2264; maxVersion &#x2264; 40
+            or -1 &#x2264; mask &#x2264; 7 is violated.</exception>
+            <exception cref="T:Net.Codecrete.QrCodeGenerator.DataTooLongException">The segments are too long to fit in the largest QR code size (version)
+            at the specified error correction level.</exception>
+        </member>
+        <member name="P:Net.Codecrete.QrCodeGenerator.QrCode.Version">
+            <summary>
+            The version (size) of this QR code (between 1 for the smallest and 40 for the biggest).
+            </summary>
+            <value>The QR code version (size).</value>
+        </member>
+        <member name="P:Net.Codecrete.QrCodeGenerator.QrCode.Size">
+            <summary>
+            The width and height of this QR code, in modules (pixels).
+            The size is a value between 21 and 177.
+            This is equal to version &#xD7; 4 + 17.
+            </summary>
+            <value>The QR code size.</value>
+        </member>
+        <member name="P:Net.Codecrete.QrCodeGenerator.QrCode.ErrorCorrectionLevel">
+            <summary>
+            The error correction level used for this QR code.
+            </summary>
+            <value>The error correction level.</value>
+        </member>
+        <member name="P:Net.Codecrete.QrCodeGenerator.QrCode.Mask">
+            <summary>
+            The index of the mask pattern used fort this QR code (between 0 and 7).
+            <para>
+            Even if a QR code is created with automatic mask selection (<c>mask</c> = 1),
+            this property returns the effective mask used.
+            </para>
+            </summary>
+            <value>The mask pattern index.</value>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.#ctor(System.Int32,Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Byte[],System.Int32)">
+            <summary>
+            Constructs a QR code with the specified version number,
+            error correction level, data codeword bytes, and mask number.
+            </summary>
+            <remarks>
+            This is a low-level API that most users should not use directly. A mid-level
+            API is the <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeSegments(System.Collections.Generic.List{Net.Codecrete.QrCodeGenerator.QrSegment},Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Int32,System.Int32,System.Int32,System.Boolean)"/> function.
+            </remarks>
+            <param name="version">The version (size) to use (between 1 to 40).</param>
+            <param name="ecl">The error correction level to use.</param>
+            <param name="dataCodewords">The bytes representing segments to encode (without ECC).</param>
+            <param name="mask">The mask pattern to use (either -1 for automatic selection, or a value from 0 to 7 for fixed choice).</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="ecl"/> or <paramref name="dataCodewords"/> is <c>null</c>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">The version or mask value is out of range,
+            or the data has an invalid length for the specified version and error correction level.</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.GetModule(System.Int32,System.Int32)">
+            <summary>
+            Gets the color of the module (pixel) at the specified coordinates.
+            <para>
+            The top left corner has the coordinates (x=0, y=0). <i>x</i>-coordinates extend from left to right,
+            <i>y</i>-coordinates extend from top to bottom.
+            </para>
+            <para>
+            If coordinates outside the bounds of this QR code are specified, light (<c>false</c>) is returned.
+            </para>
+            </summary>
+            <param name="x">The x coordinate.</param>
+            <param name="y">The y coordinate.</param>
+            <returns>The color of the specified module: <c>true</c> for dark modules and <c>false</c>
+            for light modules (or if the coordinates are outside the bounds).</returns>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.ToSvgString(System.Int32)">
+            <summary>
+            Creates an SVG image of this QR code.
+            <para>
+            The images uses Unix newlines (\n), regardless of the platform.
+            </para>
+            </summary>
+            <param name="border">The border width, as a factor of the module (QR code pixel) size</param>
+            <returns>The SVG image as a string.</returns>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.ToSvgString(System.Int32,System.String,System.String)">
+            <summary>
+            Creates an SVG image of this QR code.
+            <para>
+            The images uses Unix newlines (\n), regardless of the platform.
+            </para>
+            <para>
+            Colors are specified using CSS color data type. Examples of valid values are
+            "#339966", "fuchsia", "rgba(137, 23, 89, 0.3)".
+            </para>
+            </summary>
+            <param name="border">The border width, as a factor of the module (QR code pixel) size</param>
+            <param name="foreground">The foreground color.</param>
+            <param name="background">The background color.</param>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.ToGraphicsPath(System.Int32)">
+            <summary>
+            Creates a graphics path of this QR code valid in SVG or XAML.
+            <para>
+            The graphics path uses a coordinate system where each module is 1 unit wide and tall,
+            and the top left module is offset vertically and horizontally by <i>border</i> units.
+            </para>
+            <para>
+            Note that a border width other than 0 only make sense if the bounding box of the QR code
+            is explicitly set by the graphics using this path. If the bounding box of this path is
+            automatically derived, at least the right and bottom border will be missing.
+            </para>
+            <para>
+            The path will look like this: <c>M3,3h7v1h-7z M12,3h1v4h-1z ... M70,71h1v1h-1z</c>. It
+            is valid for SVG (<c>&lt;path d="M3,3h..." /&gt;</c>) and for XAML
+            (<c>&lt;Path Data="M3,3h..." /&gt;</c>). For programmatic geometry creation in WPF see
+            <a href="https://docs.microsoft.com/en-us/dotnet/api/system.windows.media.geometry.parse?view=windowsdesktop-6.0">Geometry.Parse(String)</a>.
+            </para>
+            </summary>
+            <param name="border">The border width, as a factor of the module (QR code pixel) size</param>
+            <returns>The graphics path</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if border is negative</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.ToBmpBitmap(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Creates a bitmap in the BMP format.
+            <para>
+            The bitmap uses 1 bit per pixel and a color table with 2 entries.
+            </para>
+            <para>
+            Color values can be created with <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.RgbColor(System.Byte,System.Byte,System.Byte)"/>.
+            </para>
+            </summary>
+            <param name="border">The border width, as a factor of the module (QR code pixel) size.</param>
+            <param name="scale">The width and height, in pixels, of each module.</param>
+            <param name="foreground">The foreground color (dark modules), in RGB value (little endian).</param>
+            <param name="background">The background color (light modules), in RGB value (little endian).</param>
+            <returns>Bitmap data</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if <paramref name="border"/> is negative,
+            <paramref name="scale"/> is less than 1 or the resulting image is wider than 32,768 pixels.</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.ToBmpBitmap(System.Int32,System.Int32)">
+            <summary>
+            Creates bitmap in the BMP format data using black for dark modules and white for light modules.
+            <para>
+            The bitmap uses 1 bit per pixel and a color table with 2 entries.
+            </para>
+            </summary>
+            <param name="border">The border width, as a factor of the module (QR code pixel) size.</param>
+            <param name="scale">The width and height, in pixels, of each module.</param>
+            <returns>Bitmap data</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown if <paramref name="border"/> is negative,
+            <paramref name="scale"/> is less than 1 or the resulting image is wider than 32,768 pixels.</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrCode.RgbColor(System.Byte,System.Byte,System.Byte)">
+            <summary>
+            Creates an RGB color value in little endian format.
+            </summary>
+            <param name="red">Red component.</param>
+            <param name="green">Green component.</param>
+            <param name="blue">Blue component.</param>
+            <returns>RGB color value</returns>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrCode.MinVersion">
+            <summary>
+            The minimum version (size) supported in the QR Code Model 2 standard – namely 1.
+            </summary>
+            <value>The minimum version.</value>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrCode.MaxVersion">
+            <summary>
+            The maximum version (size) supported in the QR Code Model 2 standard – namely 40.
+            </summary>
+            <value>The maximum version.</value>
+        </member>
+        <member name="T:Net.Codecrete.QrCodeGenerator.QrCode.Ecc">
+            <summary>
+            Error correction level in QR code symbol.
+            </summary>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrCode.Ecc.Low">
+            <summary>
+            Low error correction level. The QR code can tolerate about 7% erroneous codewords.
+            </summary>
+            <value>Low error correction level.</value>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrCode.Ecc.Medium">
+            <summary>
+            Medium error correction level. The QR code can tolerate about 15% erroneous codewords.
+            </summary>
+            <value>Medium error correction level.</value>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrCode.Ecc.Quartile">
+            <summary>
+            Quartile error correction level. The QR code can tolerate about 25% erroneous codewords.
+            </summary>
+            <value>Quartile error correction level.</value>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrCode.Ecc.High">
+            <summary>
+            High error correction level. The QR code can tolerate about 30% erroneous codewords.
+            </summary>
+            <value>High error correction level.</value>
+        </member>
+        <member name="P:Net.Codecrete.QrCodeGenerator.QrCode.Ecc.Ordinal">
+            <summary>
+            Ordinal number of error correction level (in the range 0 to 3).
+            </summary>
+            <remarks>
+            Higher number represent a higher amount of error tolerance.
+            </remarks>
+            <value>Ordinal number.</value>
+        </member>
+        <member name="T:Net.Codecrete.QrCodeGenerator.QrSegment">
+            <summary>
+            Represents a segment of character/binary/control data in a QR code symbol.
+            </summary>
+            <remarks>
+            <para>
+            The easiest way to deal with QR code segments is to call
+            <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeText(System.String,Net.Codecrete.QrCodeGenerator.QrCode.Ecc)"/> or <see cref="M:Net.Codecrete.QrCodeGenerator.QrCode.EncodeBinary(System.Byte[],Net.Codecrete.QrCodeGenerator.QrCode.Ecc)"/>, and not
+            to use instances of this class directly. The mid-level way is to take the payload
+            data and call a static factory function such as <see cref="M:Net.Codecrete.QrCodeGenerator.QrSegment.MakeNumeric(System.String)"/>.
+            The low-level way is to custom-make the bit array and call the
+            <see cref="M:Net.Codecrete.QrCodeGenerator.QrSegment.#ctor(Net.Codecrete.QrCodeGenerator.QrSegment.Mode,System.Int32,System.Collections.BitArray)"/> constructor with appropriate values.
+            </para>
+            <para>
+            This segment class imposes no length restrictions, but QR codes have restrictions.
+            Even in the most favorable conditions, a QR code can only hold 7089 characters of data.
+            Any segment longer than this is meaningless for the purpose of generating QR codes.
+            </para>
+            <para>
+            This class can represent kanji mode segments, but provides no help in encoding them
+            - see <see cref="T:Net.Codecrete.QrCodeGenerator.QrSegmentAdvanced"/> for full kanji support.
+            </para>
+            <para>
+            Instances of this class are immutable.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegment.MakeBytes(System.Byte[])">
+            <summary>
+            Creates a segment representing the specified binary data
+            encoded in byte mode. All input byte arrays are acceptable.
+            <para>
+            Any text string can be converted to UTF-8 bytes (using <c>Encoding.UTF8.GetBytes(str)</c>)
+            and encoded as a byte mode segment.
+            </para>
+            </summary>
+            <param name="data">The binary data to encode.</param>
+            <returns>The created segment containing the specified data.</returns>
+            <exception cref="T:System.ArgumentNullException"><c>data</c> is <c>null</c>.</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegment.MakeNumeric(System.String)">
+            <summary>
+            Creates a segment representing the specified string of decimal digits.
+            The segment is encoded in numeric mode.
+            </summary>
+            <param name="digits">The text to encode, consisting of digits from 0 to 9 only.</param>
+            <returns>The created segment containing the text.</returns>
+            <exception cref="T:System.ArgumentNullException"><c>digits</c> is <c>null</c>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><c>digits</c> contains non-digit characters</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegment.MakeAlphanumeric(System.String)">
+            <summary>
+            Creates a segment representing the specified text string.
+            The segment is encoded in alphanumeric mode.
+            <para>
+            Allowed characters are: 0 to 9, A to Z (uppercase only), space,
+            dollar, percent, asterisk, plus, hyphen, period, slash, colon.
+            </para>
+            </summary>
+            <param name="text">The text to encode, consisting of allowed characters only.</param>
+            <returns>The created segment containing the text.</returns>
+            <exception cref="T:System.ArgumentNullException"><c>text</c> is <c>null</c>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><c>text</c> contains non-encodable characters.</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegment.MakeSegments(System.String)">
+            <summary>
+            Creates a list of zero or more segments representing the specified text string.
+            <para>
+            The text may contain the full range of Unicode characters.
+            </para>
+            <para>
+            The result may multiple segments with various encoding modes in order to minimize the length of the bit stream.
+            </para>
+            </summary>
+            <param name="text">The text to be encoded.</param>
+            <returns>The created mutable list of segments representing the specified text.</returns>
+            <exception cref="T:System.ArgumentNullException"><c>text</c> is <c>null</c>.</exception>
+            <remarks>
+            The current implementation does not use multiple segments.
+            </remarks>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegment.MakeEci(System.Int32)">
+            <summary>
+            Creates a segment representing an Extended Channel Interpretation
+            (ECI) designator with the specified assignment value.
+            </summary>
+            <param name="assignVal">The ECI assignment number (see the AIM ECI specification).</param>
+            <returns>The created segment containing the data.</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException"><c>assignVal</c>is outside the range [0, 10<sup>6</sup>).</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegment.IsNumeric(System.String)">
+            <summary>
+            Tests whether the specified string can be encoded as a segment in numeric mode.
+            <para>
+            A string is encodable iff each character is in the range "0" to "9".
+            </para>
+            </summary>
+            <param name="text">the string to test for encodability (not <c>null</c>)</param>
+            <returns><c>true</c> iff each character is in the range "0" to "9".</returns>
+            <exception cref="T:System.NullReferenceException">if the string is <c>null</c></exception>
+            <seealso cref="M:Net.Codecrete.QrCodeGenerator.QrSegment.MakeNumeric(System.String)"/>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegment.IsAlphanumeric(System.String)">
+            <summary>
+            Tests whether the specified string can be encoded as a segment in alphanumeric mode.
+            <para>
+            A string is encodable iff each character is in the range "0" to "9", "A" to "Z" (uppercase only),
+            space, dollar, percent, asterisk, plus, hyphen, period, slash, colon.
+            </para>
+            </summary>
+            <param name="text">the string to test for encodability (not <c>null</c>)</param>
+            <returns><c>true</c> iff each character is in the alphanumeric mode character set.</returns>
+            <exception cref="T:System.NullReferenceException">if the string is <c>null</c></exception>
+            <seealso cref="M:Net.Codecrete.QrCodeGenerator.QrSegment.MakeAlphanumeric(System.String)"/>
+        </member>
+        <member name="P:Net.Codecrete.QrCodeGenerator.QrSegment.EncodingMode">
+            <summary>The encoding mode of this segment.</summary>
+            <value>Encoding mode.</value>
+        </member>
+        <member name="P:Net.Codecrete.QrCodeGenerator.QrSegment.NumChars">
+            <summary>
+            The length of this segment's unencoded data.
+            <para>
+            Measured in characters for numeric/alphanumeric/kanji mode,
+            bytes for byte mode, and 0 for ECI mode.
+            </para>
+            <para>
+            Different from the data's bit length.
+            </para>
+            </summary>
+            <value>Length of the segment's unencoded data.</value>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegment.#ctor(Net.Codecrete.QrCodeGenerator.QrSegment.Mode,System.Int32,System.Collections.BitArray)">
+            <summary>
+            Initializes a QR code segment with the specified attributes and data.
+            <para>
+            The character count <paramref name="numChars"/> must agree with the mode and the bit array length,
+            but the constraint isn't checked. The specified bit array is cloned.
+            </para>
+            </summary>
+            <param name="mode">The segment mode used to encode this segment.</param>
+            <param name="numChars">The data length in characters or bytes (depending on the segment mode).</param>
+            <param name="data">The data bits.</param>
+            <exception cref="T:System.ArgumentNullException"><paramref name="mode"/> or <paramref name="data"/> is <c>null</c>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="numChars"/> is negative.</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegment.GetData">
+            <summary>
+            Returns a copy of this segment's data bits.
+            </summary>
+            <returns>A copy of the data bits.</returns>
+        </member>
+        <member name="T:Net.Codecrete.QrCodeGenerator.QrSegment.Mode">
+            <summary>
+            Segment encoding mode.
+            <para>
+            Describes how text or binary data is encoded into bits.
+            </para>
+            </summary>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrSegment.Mode.Numeric">
+            <summary>
+            Numeric encoding mode.
+            </summary>
+            <value>Numeric encoding mode.</value>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrSegment.Mode.Alphanumeric">
+            <summary>
+            Alphanumeric encoding mode.
+            </summary>
+            <value>Alphanumeric encoding mode.</value>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrSegment.Mode.Byte">
+            <summary>
+            Byte encoding mode.
+            </summary>
+            <value>Byte encoding mode.</value>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrSegment.Mode.Kanji">
+            <summary>
+            Kanji encoding mode.
+            </summary>
+            <value>Kanji encoding mode.</value>
+        </member>
+        <member name="F:Net.Codecrete.QrCodeGenerator.QrSegment.Mode.Eci">
+            <summary>
+            ECI encoding mode.
+            </summary>
+            <value>ECI encoding mode.</value>
+        </member>
+        <member name="P:Net.Codecrete.QrCodeGenerator.QrSegment.Mode.ModeBits">
+            <summary>
+            Mode indicator value.
+            <para>
+            4 bit value in the QR segment header indicating the encoding mode.
+            </para>
+            </summary>
+            <value>Mode indicator value</value>
+        </member>
+        <member name="P:Net.Codecrete.QrCodeGenerator.QrSegment.Mode.NumBitsCharCount">
+            <summary>
+            Array of character count bit length.
+            <para>
+            Number of bits for character count in QR segment header.
+            The three array values apply to versions 0 to 9, 10 to 26 and 27 to 40
+            respectively. All array values are in the range [0, 16].
+            </para>
+            </summary>
+            <value>Array of character count bit length</value>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegment.Mode.NumCharCountBits(System.Int32)">
+            <summary>
+            Returns the bit length of the character count in the QR segment header
+            for the specified QR code version. The result is in the range [0, 16].
+            </summary>
+            <param name="ver">the QR code version (between 1 and 40)</param>
+            <returns></returns>
+        </member>
+        <member name="T:Net.Codecrete.QrCodeGenerator.QrSegmentAdvanced">
+            <summary>
+            Advanced methods for encoding QR codes using Kanji mode or using multiple segments with different encodings.
+            </summary>
+            <seealso cref="T:Net.Codecrete.QrCodeGenerator.QrSegment"/>
+            <seealso cref="T:Net.Codecrete.QrCodeGenerator.QrCode"/>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegmentAdvanced.MakeSegmentsOptimally(System.String,Net.Codecrete.QrCodeGenerator.QrCode.Ecc,System.Int32,System.Int32)">
+            <summary>
+            Creates a list of zero or more segments to represent the specified text string.
+            The resulting list optimally minimizes the total encoded bit length, subjected to the constraints
+            of the specified error correction level, minimum and maximum version number.
+            <para>
+            This function potentially uses all four text encoding modes: numeric, alphanumeric, byte (UTF-8),
+            and Kanji. It is a more sophisticated but slower replacement for <see cref="M:Net.Codecrete.QrCodeGenerator.QrSegment.MakeSegments(System.String)"/>.
+            </para>
+            <para>
+            The text to be encoded can contain the full set of Unicode characters (code points).
+            </para>
+            </summary>
+            <param name="text">The text to be encoded.</param>
+            <param name="ecl">The error correction level to use.</param>
+            <param name="minVersion">The minimum version (size) of the QR code (between 1 and 40).</param>
+            <param name="maxVersion">The maximum version (size) of the QR code (between 1 and 40).</param>
+            <returns>The created mutable list of segments encoding the specified text with a minimal bit length.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="text"/> or <paramref name="ecl"/> is <c>null</c>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException">1 &#x2264; minVersion &#x2264; maxVersion &#x2264; 40 is violated.</exception>
+            <exception cref="T:Net.Codecrete.QrCodeGenerator.DataTooLongException">The text is too long to fit into the QR code with the given encoding parameters.</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegmentAdvanced.MakeKanji(System.String)">
+            <summary>
+            Creates a segment encoding the specified text in Kanji mode.
+            <para>
+            Broadly speaking, the set of encodable characters are Kanji used in Japan,
+            Hiragana, Katakana, East Asian punctuation, full-width ASCII, Greek, and Cyrillic.
+            Examples of non-encodable characters include ordinary ASCII, half-width Katakana,
+            more extensive Chinese Hanzi.
+            </para>
+            </summary>
+            <param name="text">The text to encoding, containing only characters allowed by the Kanji encoding.</param>
+            <returns>The created segment representing the specified text.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="text"/> is <c>null</c>.</exception>
+            <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="text"/> contains non-encodable characters.</exception>
+            <seealso cref="M:Net.Codecrete.QrCodeGenerator.QrSegmentAdvanced.IsEncodableAsKanji(System.String)"/>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.QrSegmentAdvanced.IsEncodableAsKanji(System.String)">
+            <summary>
+            Tests whether the specified string can be encoded as a segment in Kanji mode.
+            <para>
+            Broadly speaking, the set of encodable characters are Kanji used in Japan,
+            Hiragana, Katakana, East Asian punctuation, full-width ASCII, Greek, and Cyrillic.
+            Examples of non-encodable characters include ordinary ASCII, half-width Katakana,
+            more extensive Chinese Hanzi.
+            </para>
+            </summary>
+            <param name="text">The text to test for encodability.</param>
+            <returns><c>true</c> iff each character is in the Kanji mode character set.</returns>
+            <exception cref="T:System.ArgumentNullException"><paramref name="text"/> is <c>null</c>.</exception>
+        </member>
+        <member name="T:Net.Codecrete.QrCodeGenerator.ReedSolomonGenerator">
+            <summary>
+            Computes the Reed-Solomon error correction codewords for a sequence of data codewords at a given degree.
+            <para>
+            Instances are immutable, and the state only depends on the degree.
+            This class is useful because all data blocks in a QR code share the same the divisor polynomial.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.ReedSolomonGenerator.#ctor(System.Int32)">
+            <summary>
+            Initializes a new Reed-Solomon ECC generator for the specified degree. 
+            </summary>
+            <remarks>
+            This could be implemented as a lookup table over all possible parameter values, instead of as an algorithm.
+            </remarks>
+            <param name="degree">The divisor polynomial degree (between 1 and 255).</param>
+            <exception cref="T:System.ArgumentOutOfRangeException"><c>degree</c> &lt; 1 or <c>degree</c> &gt; 255</exception>
+        </member>
+        <member name="M:Net.Codecrete.QrCodeGenerator.ReedSolomonGenerator.GetRemainder(System.Byte[])">
+            <summary>
+            Computes the Reed-Solomon error correction codewords for the specified
+            sequence of data codewords.
+            <para>
+            This method does not alter this object's state (as it is immutable).
+            </para>
+            </summary>
+            <param name="data">The sequence of data codewords.</param>
+            <returns>The Reed-Solomon error correction codewords, as a byte array.</returns>
+            <exception cref="T:System.ArgumentNullException">If <c>data</c> is <c>null</c>.</exception>
+        </member>
+    </members>
+</doc>
