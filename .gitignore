@@ -1,0 +1,4 @@
+/Properties/PublishProfiles/*.pubxml
+/Properties/PublishProfiles/*.user
+*.pubxml
+*.user
