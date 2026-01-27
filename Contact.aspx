@@ -6,7 +6,7 @@
         <address>
             <p><a href="https://www.linkedin.com/in/kashifmushtaq">LinkedIn</a></p>
             <p><a href="https://github.com/KashifMushtaq">GitHub</a></p>
-            <p><a href="https://www.codeproject.com/Tips/5384961/How-to-add-a-Multifactor-Authentication-using-Micr">CodeProject</a></p>
+            <p><a href="https://www.codeproject.com/articles/How-to-add-a-Multifactor-Authentication-using-Micr#comments-section">CodeProject</a></p>
         </address>
 
     </main>
