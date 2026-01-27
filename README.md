@@ -4,7 +4,7 @@ A time-based, One-time Password Algorithm (RFC-6238, TOTP - HMAC-based One-time 
 Mobile application allows you to register your account with Microsoft / Google or any other TOTP authenticator application (via a specially generated QR code). After successful registration, the authenticator application will generate a new code every 30 seconds which could be used to implement MFA based sign-in. To make it a complete MFA, a PIN is added as a prefix to the application generated code. The sign-in password or some call it Passcode will be PIN+Code.
 
 # Code Project Article:
-<a href="https://www.codeproject.com/articles/How-to-add-a-Multifactor-Authentication-using-Micr">How to add a Multifactor Authentication using Microsoft or Google Authenticator</a>
+<a href="https://www.codeproject.com/articles/How-to-add-a-Multifactor-Authentication-using-Micr#comments-section">How to add a Multifactor Authentication using Microsoft or Google Authenticator</a>
 
 # Test Deployment:
 <a href="https://elogic.synology.me/TestAuthenticator">Test Authenticator</a>
